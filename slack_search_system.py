@@ -29,7 +29,7 @@ class SlackSearchSystem:
         self.min_relevance_score = min_relevance_score
         
         genai.configure(api_key=self.gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
         self.slack_client = WebClient(token=self.slack_token)
         
         self.keyword_generator = SearchKeywordGenerator(self.model)
