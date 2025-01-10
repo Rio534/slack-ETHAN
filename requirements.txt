@@ -3,6 +3,6 @@ slack-sdk
 slack-bolt==1.15.0      # Slackボットのフレームワーク
 slack-sdk==3.19.4       # Slack APIのクライアントライブラリ
 python-dotenv==1.0.0    # .envファイルから環境変数を読み込む
-google-generativeai==0.2.0  # Gemini APIなどを利用するためのGoogleのライブラリ
-
+google-generativeai>=0.3.0 # Gemini APIなどを利用するためのGoogleのライブラリ
+aiohttp==3.8.1
 
