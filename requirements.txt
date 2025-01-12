@@ -1,8 +1,7 @@
-python-dotenv
-slack-sdk
-slack-bolt==1.15.0      # Slackボットのフレームワーク
-slack-sdk==3.19.4       # Slack APIのクライアントライブラリ
-python-dotenv==1.0.0    # .envファイルから環境変数を読み込む
-google-generativeai>=0.3.0 # Gemini APIなどを利用するためのGoogleのライブラリ
-aiohttp==3.8.1
-
+slack-bolt==1.15.0        # Slack Bolt for Python
+slack-sdk==3.19.4         # Slack SDK for Python
+fastapi==0.95.2           # FastAPI framework
+uvicorn==0.22.0           # ASGI server for FastAPI
+python-dotenv==1.0.0      # .envファイルの環境変数を読み込む
+aiohttp==3.8.1            # 非同期HTTPクライアント
+google-generativeai>=0.3.0  # 検索システムで必要（Gemini APIなど）

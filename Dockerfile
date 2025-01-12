@@ -1,17 +1,18 @@
-# Python 3.10の軽量イメージを使用
+# ベースイメージ
 FROM python:3.10-slim
 
-# 作業ディレクトリを設定
+# 作業ディレクトリの設定
 WORKDIR /app
 
 # 必要なファイルをコピー
-COPY . /app
+COPY requirements.txt . 
+COPY . .
 
-# 必要なパッケージをインストール
+# 必要な依存関係をインストール
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ポートを公開（Cloud Runのデフォルトポート）
+# Cloud Run が必要とするポートの公開
 EXPOSE 8080
 
-# アプリケーションを起動
+# アプリケーションの起動コマンド
 CMD ["python", "slack_bot.py"]

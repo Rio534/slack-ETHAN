@@ -1,20 +1,28 @@
 import os
-from slack_bolt.async_app import AsyncApp
-from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
-from dotenv import load_dotenv
 import re
-from datetime import datetime
 import asyncio
-from typing import Optional, Dict, Any
+from datetime import datetime
+from typing import Dict, Any
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
+import uvicorn
+
+from slack_bolt.async_app import AsyncApp
+from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
+
 from slack_search_system import SlackSearchSystem
 
 # 環境変数の読み込み
 load_dotenv()
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
-SLACK_APP_TOKEN = os.getenv("SLACK_APP_TOKEN")  # Socket Mode用のアプリレベルトークン
+SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
 
 # Slack Boltアプリケーションの初期化
-app = AsyncApp(token=SLACK_BOT_TOKEN)
+app = AsyncApp(
+    token=SLACK_BOT_TOKEN,
+    signing_secret=SLACK_SIGNING_SECRET,
+)
 
 # 検索システムの初期化
 search_system = SlackSearchSystem()
@@ -47,7 +55,8 @@ async def post_message_in_chunks(say, text: str, thread_ts: str, chunk_size: int
     for i, chunk in enumerate(chunks, 1):
         prefix = f"(Part {i}/{len(chunks)})\n" if len(chunks) > 1 else ""
         await say(text=prefix + chunk, thread_ts=thread_ts)
-        await asyncio.sleep(1)  # API制限を考慮した待機
+        # Slack API制限を考慮した待機
+        await asyncio.sleep(1)
 
 async def process_mention(body: Dict[str, Any], say) -> None:
     """
@@ -87,17 +96,20 @@ async def process_mention(body: Dict[str, Any], say) -> None:
         await say(text=error_message, thread_ts=thread_ts)
 
 @app.event("app_mention")
-async def handle_mention(body: Dict[str, Any], logger):  # bodyとloggerを引数に追加
+async def handle_mention(body: Dict[str, Any], logger):
+    """
+    メンションイベントを処理する
+    """
     try:
         logger.info("メンションを受信しました！")
         logger.info(f"受信内容: {body}")
-        
+
         event = body["event"]
         thread_ts = event.get("thread_ts", event.get("ts"))
-        
+
         # メンションを除去してクエリを抽出
         query = re.sub(r'<@[A-Z0-9]+>', '', event.get("text")).strip()
-        
+
         if not query:
             await app.client.chat_postMessage(
                 channel=event["channel"],
@@ -119,7 +131,7 @@ async def handle_mention(body: Dict[str, Any], logger):  # bodyとloggerを引�
             channel_id=event["channel"]
         )
 
-        # 結果を投稿
+        # 結果を投稿 (シンプルに一度で投稿)
         await app.client.chat_postMessage(
             channel=event["channel"],
             thread_ts=thread_ts,
@@ -134,14 +146,18 @@ async def handle_mention(body: Dict[str, Any], logger):  # bodyとloggerを引�
             text=f"検索処理中にエラーが発生しました: {str(e)}"
         )
 
+# FastAPI アプリを作成し、slack_bolt のリクエストハンドラを紐づける
+api = FastAPI()
+handler = AsyncSlackRequestHandler(app)
 
-# アプリ起動時のログも追加
-async def main():
-    handler = AsyncSocketModeHandler(app, SLACK_APP_TOKEN)
-    print("Socket Mode ハンドラーを初期化しました")
-    print(f"Bot Token: {SLACK_BOT_TOKEN[:10]}...")
-    print(f"App Token: {SLACK_APP_TOKEN[:10]}...")
-    await handler.start_async()
+@api.post("/slack/events")
+async def slack_events(req: Request):
+    """
+    Slackからのイベントを受け付けるエンドポイント
+    """
+    return await handler.handle(req)
 
+# Cloud Run のエントリーポイント
 if __name__ == "__main__":
-    asyncio.run(main())
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(api, host="0.0.0.0", port=port)
