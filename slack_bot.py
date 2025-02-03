@@ -12,6 +12,7 @@ from slack_bolt.async_app import AsyncApp
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 
 from slack_search_system import SlackSearchSystem
+from utils import parse_channel_and_query  # utils.py から関数をインポート
 
 # 環境変数の読み込み
 load_dotenv()
@@ -145,6 +146,68 @@ async def handle_mention(body: Dict[str, Any], logger):
             thread_ts=thread_ts,
             text=f"検索処理中にエラーが発生しました: {str(e)}"
         )
+
+
+@app.event("message")
+async def handle_dm_message(body: Dict[str, Any], logger):
+    """
+    DMのメッセージを処理する
+    """
+    event = body["event"]
+    user_id = event.get("user")
+    text = event.get("text", "").strip()
+
+    if not text:
+        return
+
+    # DMでのメッセージかどうか判定
+    if event.get("channel_type") != "im":
+        return
+
+    # 🔍 チャンネル名 または チャンネルIDを取得
+    channel_identifier, query = parse_channel_and_query(text)
+
+    print(f"🔍 [DEBUG] handle_dm_message: 取得したチャンネル識別子={channel_identifier}, クエリ={query}")
+
+    # 🔹 **チャンネルIDが取得できている場合、そのまま使用**
+    if channel_identifier and channel_identifier.startswith("C"):  # Cで始まるのはSlackのチャンネルID
+        channel_id = channel_identifier
+    else:
+        # チャンネル名からチャンネルIDを検索
+        try:
+            response = await app.client.conversations_list()
+            print(f"📜 [DEBUG] conversations_list: {response}")  # チャンネルリスト全体をログに出力
+            channel_id = next(
+                (c["id"] for c in response["channels"] if c["name"] == channel_identifier), None
+            )
+        except Exception as e:
+            logger.error(f"❌ チャンネルID取得エラー: {str(e)}")
+            channel_id = None
+
+    print(f"✅ [DEBUG] 最終的な検索チャンネルID: {channel_id}")
+
+    if not channel_id:
+        await app.client.chat_postMessage(
+            channel=event["channel"],
+            text=f"⚠️ チャンネル `#{channel_identifier}` が見つかりませんでした。"
+        )
+        return
+
+    # 🔹 **デバッグ情報をDMで送信**
+    await app.client.chat_postMessage(
+        channel=event["channel"],
+        text=f"🔍 検索対象チャンネル: `<#{channel_id}>` (ID: {channel_id})\n📌 検索クエリ: `{query}`"
+    )
+
+    # 検索処理の実行
+    results = await search_system.process_query(query=query, channel_id=channel_id)
+
+    # 検索結果をDMで返す
+    await app.client.chat_postMessage(
+        channel=event["channel"],
+        text=results
+    )
+
 
 # FastAPI アプリを作成し、slack_bolt のリクエストハンドラを紐づける
 api = FastAPI()

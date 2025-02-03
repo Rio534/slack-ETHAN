@@ -1,8 +1,6 @@
-# utils.py
-
 import re
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple, Optional
 
 def clean_slack_message(text: str) -> str:
     """
@@ -136,3 +134,36 @@ def extract_relevant_sentences(text: str, query: str) -> List[str]:
             relevant_sentences.append(sentence)
     
     return relevant_sentences
+
+import re
+from typing import Tuple, Optional
+
+def parse_channel_and_query(text: str) -> Tuple[Optional[str], str]:
+    """
+    SlackメッセージからチャンネルIDまたはチャンネル名を取得し、検索クエリを抽出する
+
+    Args:
+        text (str): DMで送信されたメッセージ
+
+    Returns:
+        Tuple[Optional[str], str]: (チャンネルID または チャンネル名, 検索クエリ)
+    """
+    print(f"🔍 [DEBUG] 受信メッセージ: {text}")  # デバッグログ
+
+    # ❶ Slackのフォーマット "<#C12345678|チャンネル名>" または "<#C12345678|>" に対応
+    match = re.match(r"<#([A-Z0-9]+)(?:\|[^>]*)?>\s*(.+)", text)
+    if match:
+        channel_id = match.group(1)
+        query = match.group(2)
+        print(f"✅ [DEBUG] 解析結果: チャンネルID={channel_id}, クエリ={query}")
+        return channel_id, query
+
+    # ❷ 旧形式 "#general クエリ" に対応
+    match = re.match(r"#(\S+)\s+(.*)", text)
+    if match:
+        print(f"✅ [DEBUG] 解析結果: チャンネル名={match.group(1)}, クエリ={match.group(2)}")
+        return match.group(1), match.group(2)
+
+    # ❸ チャンネル名なし → 検索クエリのみ
+    print(f"⚠️ [DEBUG] チャンネル名が取得できませんでした。")
+    return None, text
