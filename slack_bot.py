@@ -215,9 +215,14 @@ handler = AsyncSlackRequestHandler(app)
 
 @api.post("/slack/events")
 async def slack_events(req: Request):
-    """
-    Slackからのイベントを受け付けるエンドポイント
-    """
+    data = await req.json()  # リクエストボディをJSONとして解析
+    print(f"🔍 [DEBUG] slack_events: リクエストデータ: {data}")  # デバッグ用ログ
+
+    if data.get("type") == "url_verification":
+        challenge = data.get("challenge")
+        print(f"✅ [DEBUG] slack_events: challengeパラメータ: {challenge}")  # challengeパラメータのログ
+        return {"challenge": challenge}  # challenge をそのまま返す
+
     return await handler.handle(req)
 
 # Cloud Run のエントリーポイント
